@@ -36,10 +36,3 @@ logs/
 # Database (don't commit actual database files)
 *.db
 *.sqlite
-
-echo ".metadata/" >> .gitignore
-echo "*.class" >> .gitignore
-echo "bin/" >> .gitignore
-echo ".settings/" >> .gitignore
-echo ".project" >> .gitignore
-echo ".classpath" >> .gitignore

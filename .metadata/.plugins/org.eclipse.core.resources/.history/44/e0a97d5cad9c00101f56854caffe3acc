@@ -1,0 +1,166 @@
+package com.farmchainx.backend.service;
+
+import com.farmchainx.backend.dto.OrderDTO;
+import com.farmchainx.backend.dto.OrderItemDTO;
+import com.farmchainx.backend.dto.OrderRequestDTO;
+import com.farmchainx.backend.entity.*;
+import com.farmchainx.backend.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional
+public class OrderService {
+    
+    @Autowired
+    private OrderRepository orderRepository;
+    
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+    
+    @Autowired
+    private ProductRepository productRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    public Order createOrder(OrderRequestDTO orderRequest, Long consumerId) {
+        User consumer = userRepository.findById(consumerId)
+                .orElseThrow(() -> new RuntimeException("Consumer not found"));
+        
+        User distributor = userRepository.findById(orderRequest.getDistributorId())
+                .orElseThrow(() -> new RuntimeException("Distributor not found"));
+        
+        Order order = new Order();
+        order.setConsumer(consumer);
+        order.setDistributor(distributor);
+        order.setCustomerName(orderRequest.getCustomerName());
+        order.setCustomerPhone(orderRequest.getCustomerPhone());
+        order.setShippingAddress(orderRequest.getShippingAddress());
+        order.setPaymentMethod(orderRequest.getPaymentMethod());
+        order.setStatus("PENDING");
+        
+        double totalAmount = 0.0;
+        
+        // First validate all products and quantities
+        for (OrderItemRequestDTO itemRequest : orderRequest.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + itemRequest.getProductId()));
+            
+            if (product.getQuantity() < itemRequest.getQuantity()) {
+                throw new RuntimeException("Insufficient quantity for product: " + product.getName());
+            }
+        }
+        
+        // Then process the order
+        Order savedOrder = orderRepository.save(order);
+        
+        for (OrderItemRequestDTO itemRequest : orderRequest.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId()).get();
+            
+            // Update product quantity
+            product.setQuantity(product.getQuantity() - itemRequest.getQuantity());
+            if (product.getQuantity() == 0) {
+                product.setIsAvailable(false);
+            }
+            productRepository.save(product);
+            
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(savedOrder);
+            orderItem.setProduct(product);
+            orderItem.setQuantity(itemRequest.getQuantity());
+            orderItem.setPrice(product.getPrice());
+            orderItem.setSubtotal(product.getPrice() * itemRequest.getQuantity());
+            
+            totalAmount += orderItem.getSubtotal();
+            orderItemRepository.save(orderItem);
+        }
+        
+        savedOrder.setTotalAmount(totalAmount);
+        return orderRepository.save(savedOrder);
+    }
+    
+    public List<OrderDTO> getOrdersByConsumer(Long consumerId) {
+        User consumer = userRepository.findById(consumerId)
+                .orElseThrow(() -> new RuntimeException("Consumer not found"));
+        
+        return orderRepository.findByConsumer(consumer).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    public List<OrderDTO> getOrdersByDistributor(Long distributorId) {
+        User distributor = userRepository.findById(distributorId)
+                .orElseThrow(() -> new RuntimeException("Distributor not found"));
+        
+        return orderRepository.findByDistributor(distributor).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    public Order updateOrderStatus(Long orderId, String status) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        
+        order.setStatus(status);
+        return orderRepository.save(order);
+    }
+    
+    public OrderDTO getOrderById(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        return convertToDTO(order);
+    }
+    
+    private OrderDTO convertToDTO(Order order) {
+        OrderDTO dto = new OrderDTO();
+        dto.setId(order.getId());
+        dto.setOrderNumber(order.getOrderNumber());
+        dto.setConsumerId(order.getConsumer().getId());
+        dto.setDistributorId(order.getDistributor().getId());
+        dto.setConsumerName(order.getConsumer().getFullName());
+        dto.setDistributorName(order.getDistributor().getFullName());
+        dto.setTotalAmount(order.getTotalAmount());
+        dto.setStatus(order.getStatus());
+        dto.setShippingAddress(order.getShippingAddress());
+        dto.setCustomerName(order.getCustomerName());
+        dto.setCustomerPhone(order.getCustomerPhone());
+        dto.setPaymentMethod(order.getPaymentMethod());
+        dto.setOrderDate(order.getOrderDate());
+        dto.setDeliveryDate(order.getDeliveryDate());
+        
+        // Convert order items
+        List<OrderItemDTO> itemDTOs = orderItemRepository.findByOrderId(order.getId()).stream()
+                .map(this::convertItemToDTO)
+                .collect(Collectors.toList());
+        dto.setOrderItems(itemDTOs);
+        
+        return dto;
+    }
+    
+    private OrderItemDTO convertItemToDTO(OrderItem item) {
+        OrderItemDTO dto = new OrderItemDTO();
+        dto.setProductId(item.getProduct().getId());
+        dto.setProductName(item.getProduct().getName());
+        dto.setQuantity(item.getQuantity());
+        dto.setPrice(item.getPrice());
+        dto.setSubtotal(item.getSubtotal());
+        return dto;
+    }
+    
+    // Inner class for OrderItemRequestDTO
+    public static class OrderItemRequestDTO {
+        private Long productId;
+        private Integer quantity;
+
+        public Long getProductId() { return productId; }
+        public void setProductId(Long productId) { this.productId = productId; }
+
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    }
+}

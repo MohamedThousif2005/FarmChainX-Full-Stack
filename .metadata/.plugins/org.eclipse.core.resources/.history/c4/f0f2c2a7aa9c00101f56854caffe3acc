@@ -1,0 +1,5 @@
+package com.farmchainx.backend.entity;
+
+public class Product {
+
+}

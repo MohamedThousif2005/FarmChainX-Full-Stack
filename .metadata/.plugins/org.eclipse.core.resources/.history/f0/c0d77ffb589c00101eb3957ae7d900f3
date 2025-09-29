@@ -1,0 +1,287 @@
+package com.farmchainx.backend.controller;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174"})
+public class AuthController {
+    
+    private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    public AuthController(UserService userService, PasswordEncoder passwordEncoder) {
+        this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
+        try {
+            System.out.println("=== REGISTRATION ATTEMPT ===");
+            System.out.println("Email: " + user.getEmail());
+            System.out.println("Full Name: " + user.getFullName());
+            System.out.println("Role: " + user.getRole());
+            
+            if (userService.emailExists(user.getEmail())) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Email already exists");
+                response.put("code", "EMAIL_EXISTS");
+                System.out.println("Registration failed: Email already exists");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            User newUser = new User();
+            newUser.setFullName(user.getFullName());
+            newUser.setEmail(user.getEmail());
+            
+            // ENCODE PASSWORD
+            String encodedPassword = passwordEncoder.encode(user.getPassword());
+            newUser.setPassword(encodedPassword);
+            
+            newUser.setRole(user.getRole());
+            newUser.setApproved(true);
+            
+            // Set optional fields
+            if (user.getFarmName() != null) newUser.setFarmName(user.getFarmName());
+            if (user.getCompanyName() != null) newUser.setCompanyName(user.getCompanyName());
+            
+            User createdUser = userService.createUser(newUser);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Registration successful! You can now login.");
+            response.put("user", createdUser);
+            response.put("status", "success");
+            
+            System.out.println("Registration successful for: " + user.getEmail());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.out.println("Registration error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Registration failed: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @PostMapping("/login")
+    public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+        try {
+            System.out.println("=== LOGIN ATTEMPT ===");
+            System.out.println("Email: " + loginRequest.getEmail());
+            
+            User user = userService.getUserByEmail(loginRequest.getEmail())
+                    .orElseThrow(() -> {
+                        System.out.println("User not found: " + loginRequest.getEmail());
+                        return new RuntimeException("Invalid email or password");
+                    });
+            
+            System.out.println("User found: " + user.getEmail());
+            System.out.println("Stored password hash: " + user.getPassword());
+            
+            // Check password match
+            boolean passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), user.getPassword());
+            System.out.println("Password matches: " + passwordMatches);
+            
+            if (!passwordMatches) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Invalid email or password");
+                response.put("code", "INVALID_CREDENTIALS");
+                System.out.println("Login failed: Password mismatch");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Map<String, Object> userResponse = new HashMap<>();
+            userResponse.put("id", user.getId());
+            userResponse.put("fullName", user.getFullName());
+            userResponse.put("email", user.getEmail());
+            userResponse.put("role", user.getRole());
+            userResponse.put("approved", user.getApproved());
+            userResponse.put("createdAt", user.getCreatedAt());
+            userResponse.put("farmName", user.getFarmName());
+            userResponse.put("companyName", user.getCompanyName());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Login successful");
+            response.put("user", userResponse);
+            response.put("role", user.getRole());
+            response.put("status", "success");
+            
+            System.out.println("Login successful for: " + user.getEmail());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.out.println("Login error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Login failed: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @PostMapping("/reset-passwords")
+    public ResponseEntity<?> resetAllPasswords() {
+        try {
+            System.out.println("=== RESETTING PASSWORDS ===");
+            java.util.List<User> allUsers = userService.getAllUsers();
+            int resetCount = 0;
+            
+            for (User user : allUsers) {
+                System.out.println("Checking user: " + user.getEmail());
+                // If password is not encoded (doesn't start with $2a$), re-encode it
+                if (!user.getPassword().startsWith("$2a$")) {
+                    String encodedPassword = passwordEncoder.encode(user.getPassword());
+                    user.setPassword(encodedPassword);
+                    userService.updateUser(user);
+                    resetCount++;
+                    System.out.println("Reset password for: " + user.getEmail());
+                }
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Reset " + resetCount + " passwords");
+            response.put("totalUsers", allUsers.size());
+            response.put("resetCount", resetCount);
+            response.put("status", "success");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to reset passwords: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @GetMapping("/check-user/{email}")
+    public ResponseEntity<?> checkUser(@PathVariable String email) {
+        try {
+            System.out.println("=== CHECKING USER ===");
+            System.out.println("Email: " + email);
+            
+            User user = userService.getUserByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("email", user.getEmail());
+            response.put("fullName", user.getFullName());
+            response.put("role", user.getRole());
+            response.put("approved", user.getApproved());
+            response.put("passwordEncoded", user.getPassword().startsWith("$2a$"));
+            response.put("passwordLength", user.getPassword().length());
+            response.put("status", "success");
+            
+            System.out.println("User found: " + user.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @GetMapping("/all-users")
+    public ResponseEntity<?> getAllUsers() {
+        try {
+            java.util.List<User> users = userService.getAllUsers();
+            Map<String, Object> response = new HashMap<>();
+            response.put("users", users);
+            response.put("count", users.size());
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @PostMapping("/create-test-users")
+    public ResponseEntity<?> createTestUsers() {
+        try {
+            // Create test farmer
+            if (!userService.emailExists("farmer@test.com")) {
+                User farmer = new User();
+                farmer.setFullName("Test Farmer");
+                farmer.setEmail("farmer@test.com");
+                farmer.setPassword(passwordEncoder.encode("password123"));
+                farmer.setRole("FARMER");
+                farmer.setFarmName("Test Farm");
+                farmer.setApproved(true);
+                userService.createUser(farmer);
+            }
+            
+            // Create test distributor
+            if (!userService.emailExists("distributor@test.com")) {
+                User distributor = new User();
+                distributor.setFullName("Test Distributor");
+                distributor.setEmail("distributor@test.com");
+                distributor.setPassword(passwordEncoder.encode("password123"));
+                distributor.setRole("DISTRIBUTOR");
+                distributor.setCompanyName("Test Distributors");
+                distributor.setApproved(true);
+                userService.createUser(distributor);
+            }
+            
+            // Create test consumer
+            if (!userService.emailExists("consumer@test.com")) {
+                User consumer = new User();
+                consumer.setFullName("Test Consumer");
+                consumer.setEmail("consumer@test.com");
+                consumer.setPassword(passwordEncoder.encode("password123"));
+                consumer.setRole("CONSUMER");
+                consumer.setApproved(true);
+                userService.createUser(consumer);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Test users created successfully");
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to create test users: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @GetMapping("/status")
+    public ResponseEntity<?> authStatus() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Auth Controller");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        response.put("message", "Auth service is running properly");
+        return ResponseEntity.ok(response);
+    }
+    
+    public static class LoginRequest {
+        private String email;
+        private String password;
+        
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+    }
+}

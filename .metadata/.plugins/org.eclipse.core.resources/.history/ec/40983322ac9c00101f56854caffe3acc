@@ -1,0 +1,100 @@
+package com.farmchainx.backend.service;
+
+import com.farmchainx.backend.dto.OrderDTO;
+import com.farmchainx.backend.dto.OrderItemDTO;
+import org.springframework.stereotype.Service;
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
+
+@Service
+public class PdfService {
+    
+    public byte[] generateInvoicePdf(OrderDTO order) throws DocumentException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document();
+        PdfWriter.getInstance(document, baos);
+        
+        document.open();
+        
+        // Title
+        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.DARK_GRAY);
+        Paragraph title = new Paragraph("FarmChainX - Invoice", titleFont);
+        title.setAlignment(Element.ALIGN_CENTER);
+        title.setSpacingAfter(20);
+        document.add(title);
+        
+        // Order Information
+        Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.BLACK);
+        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12, BaseColor.BLACK);
+        
+        PdfPTable infoTable = new PdfPTable(2);
+        infoTable.setWidthPercentage(100);
+        infoTable.setSpacingAfter(20);
+        
+        addTableHeader(infoTable, "Order Information", headerFont, 2);
+        addTableRow(infoTable, "Order Number:", order.getOrderNumber(), normalFont);
+        addTableRow(infoTable, "Order Date:", 
+                   order.getOrderDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), normalFont);
+        addTableRow(infoTable, "Status:", order.getStatus(), normalFont);
+        addTableRow(infoTable, "Customer:", order.getCustomerName(), normalFont);
+        addTableRow(infoTable, "Phone:", order.getCustomerPhone(), normalFont);
+        addTableRow(infoTable, "Address:", order.getShippingAddress(), normalFont);
+        addTableRow(infoTable, "Payment Method:", order.getPaymentMethod(), normalFont);
+        
+        document.add(infoTable);
+        
+        // Order Items
+        PdfPTable itemsTable = new PdfPTable(4);
+        itemsTable.setWidthPercentage(100);
+        itemsTable.setSpacingAfter(20);
+        
+        // Table headers
+        String[] itemHeaders = {"Product", "Quantity", "Price", "Subtotal"};
+        for (String header : itemHeaders) {
+            PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
+            cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            itemsTable.addCell(cell);
+        }
+        
+        // Table rows
+        for (OrderItemDTO item : order.getOrderItems()) {
+            itemsTable.addCell(new Phrase(item.getProductName(), normalFont));
+            itemsTable.addCell(new Phrase(item.getQuantity().toString(), normalFont));
+            itemsTable.addCell(new Phrase(String.format("₹%.2f", item.getPrice()), normalFont));
+            itemsTable.addCell(new Phrase(String.format("₹%.2f", item.getSubtotal()), normalFont));
+        }
+        
+        document.add(itemsTable);
+        
+        // Total
+        Paragraph total = new Paragraph(String.format("Total Amount: ₹%.2f", order.getTotalAmount()), headerFont);
+        total.setAlignment(Element.ALIGN_RIGHT);
+        document.add(total);
+        
+        // Footer
+        Paragraph footer = new Paragraph("\n\nThank you for your order!\nFarmChainX - Fresh Farm Products", normalFont);
+        footer.setAlignment(Element.ALIGN_CENTER);
+        document.add(footer);
+        
+        document.close();
+        return baos.toByteArray();
+    }
+    
+    private void addTableHeader(PdfPTable table, String header, Font font, int colspan) {
+        PdfPCell cell = new PdfPCell(new Phrase(header, font));
+        cell.setColspan(colspan);
+        cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(cell);
+    }
+    
+    private void addTableRow(PdfPTable table, String label, String value, Font font) {
+        table.addCell(new Phrase(label, font));
+        table.addCell(new Phrase(value, font));
+    }
+}

@@ -1,0 +1,15 @@
+# application.properties
+server.port=8090
+spring.datasource.url=jdbc:mysql://localhost:3306/farmchainx_db
+spring.datasource.username=farmchainx_user
+spring.datasource.password=thousiffarmer
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+
+# CORS configuration
+cors.allowed-origins=http://localhost:3000,http://localhost:5173,http://localhost:5174
+
+# Logging
+logging.level.com.farmchainx.backend=DEBUG

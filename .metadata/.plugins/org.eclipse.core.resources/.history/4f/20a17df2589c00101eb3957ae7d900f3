@@ -1,0 +1,40 @@
+package com.farmchainx.backend.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/test")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174"})
+public class TestController {
+
+    @GetMapping("/status")
+    public Map<String, Object> getStatus() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Test Controller");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        response.put("message", "Backend is running properly");
+        return response;
+    }
+
+    @PostMapping("/echo")
+    public Map<String, Object> echo(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("received", request);
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        return response;
+    }
+
+    @GetMapping("/users")
+    public Map<String, Object> getUsers() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("message", "This is a public endpoint");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        return response;
+    }
+}

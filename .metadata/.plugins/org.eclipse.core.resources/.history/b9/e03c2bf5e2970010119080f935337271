@@ -1,0 +1,127 @@
+package com.farmchainx.backend.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "crops")
+public class Crop {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank(message = "Crop name is required")
+    private String name;
+
+    @NotBlank(message = "Crop type is required")
+    private String type;
+
+    @NotBlank(message = "Soil type is required")
+    private String soil;
+
+    @NotBlank(message = "Location is required")
+    private String place;
+
+    private String comments;
+    private String image;
+
+    @NotNull(message = "Sowed date is required")
+    @Column(name = "sowed_date")
+    private LocalDate sowedDate;
+
+    @NotNull(message = "Harvest period is required")
+    @Positive(message = "Harvest period must be positive")
+    @Column(name = "harvest_period")
+    private Integer harvestPeriod;
+
+    @Column(name = "approx_harvest")
+    private LocalDate approxHarvest;
+
+    @NotBlank(message = "Status is required")
+    private String status = "Active";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @Column(name = "created_at")
+    private java.time.LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private java.time.LocalDateTime updatedAt;
+
+    // Constructors
+    public Crop() {
+        this.createdAt = java.time.LocalDateTime.now();
+        this.updatedAt = java.time.LocalDateTime.now();
+    }
+
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+
+    public String getSoil() { return soil; }
+    public void setSoil(String soil) { this.soil = soil; }
+
+    public String getPlace() { return place; }
+    public void setPlace(String place) { this.place = place; }
+
+    public String getComments() { return comments; }
+    public void setComments(String comments) { this.comments = comments; }
+
+    public String getImage() { return image; }
+    public void setImage(String image) { this.image = image; }
+
+    public LocalDate getSowedDate() { return sowedDate; }
+    public void setSowedDate(LocalDate sowedDate) { 
+        this.sowedDate = sowedDate;
+        calculateHarvestDate();
+    }
+
+    public Integer getHarvestPeriod() { return harvestPeriod; }
+    public void setHarvestPeriod(Integer harvestPeriod) { 
+        this.harvestPeriod = harvestPeriod;
+        calculateHarvestDate();
+    }
+
+    public LocalDate getApproxHarvest() { return approxHarvest; }
+    public void setApproxHarvest(LocalDate approxHarvest) { this.approxHarvest = approxHarvest; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public java.time.LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(java.time.LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    private void calculateHarvestDate() {
+        if (this.sowedDate != null && this.harvestPeriod != null) {
+            this.approxHarvest = this.sowedDate.plusDays(this.harvestPeriod);
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = java.time.LocalDateTime.now();
+        calculateHarvestDate();
+    }
+
+    @PrePersist
+    public void prePersist() {
+        calculateHarvestDate();
+    }
+}
