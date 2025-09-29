@@ -1,0 +1,34 @@
+package com.farmchainx.backend.dto;
+
+import java.util.List;
+
+public class OrderRequestDTO {
+    private Long distributorId;
+    private String customerName;
+    private String customerPhone;
+    private String shippingAddress;
+    private String paymentMethod;
+    private List<OrderItemRequestDTO> items;
+    
+    // Constructors, Getters and Setters
+    public OrderRequestDTO() {}
+    
+    // Getters and Setters
+    public Long getDistributorId() { return distributorId; }
+    public void setDistributorId(Long distributorId) { this.distributorId = distributorId; }
+    
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+    
+    public String getShippingAddress() { return shippingAddress; }
+    public void setShippingAddress(String shippingAddress) { this.shippingAddress = shippingAddress; }
+    
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+    
+    public List<OrderItemRequestDTO> getItems() { return items; }
+    public void setItems(List<OrderItemRequestDTO> items) { this.items = items; }
+}

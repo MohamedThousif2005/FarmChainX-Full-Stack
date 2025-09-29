@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Access Denied</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #d32f2f; }
+        .container { max-width: 600px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚫 Access Denied</h1>
+        <p>You don't have sufficient permissions to access this page.</p>
+        <div>
+            <a th:href="@{/}" style="margin-right: 20px; color: #2196f3; text-decoration: none;">Home</a>
+            <a th:href="@{/login}" style="color: #2196f3; text-decoration: none;">Login with different account</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,126 @@
+package com.farmchainx.backend.controller;
+
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/crop-analysis")
+@CrossOrigin(origins = "*")
+public class CropAnalysisController {
+
+    private final String AI_SERVICE_URL = "http://localhost:5000";
+    private final RestTemplate restTemplate;
+
+    public CropAnalysisController(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
+
+    @PostMapping("/analyze")
+    public ResponseEntity<?> analyzeCropImage(
+            @RequestParam("image") MultipartFile imageFile,
+            @RequestParam(value = "cropType", required = false) String cropType) {
+        
+        try {
+            // Prepare request to Python AI service
+            String url = AI_SERVICE_URL + "/analyze/file";
+            
+            // Create headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            
+            // Create body with file and crop type
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("file", imageFile.getResource());
+            if (cropType != null) {
+                body.add("crop_type", cropType);
+            }
+            
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+            
+            // Send request to AI service
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, requestEntity, Map.class);
+            
+            return ResponseEntity.ok(response.getBody());
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Analysis failed: " + e.getMessage());
+            errorResponse.put("analysis", getDefaultAnalysis());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/analyze-base64")
+    public ResponseEntity<?> analyzeCropImageBase64(@RequestBody Map<String, Object> request) {
+        try {
+            String imageBase64 = (String) request.get("image");
+            String cropType = (String) request.get("cropType");
+            
+            // Prepare request to Python AI service
+            String url = AI_SERVICE_URL + "/analyze";
+            
+            Map<String, Object> aiRequest = new HashMap<>();
+            aiRequest.put("image", imageBase64);
+            aiRequest.put("crop_type", cropType);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(aiRequest, headers);
+            
+            // Send request to AI service
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, requestEntity, Map.class);
+            
+            return ResponseEntity.ok(response.getBody());
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Analysis failed: " + e.getMessage());
+            errorResponse.put("analysis", getDefaultAnalysis());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<?> checkAIServiceHealth() {
+        try {
+            String url = AI_SERVICE_URL + "/health";
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            return ResponseEntity.ok(response.getBody());
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "unhealthy");
+            response.put("error", "AI service not available: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
+    }
+
+    private Map<String, Object> getDefaultAnalysis() {
+        Map<String, Object> analysis = new HashMap<>();
+        analysis.put("overall_condition", "Good");
+        analysis.put("freshness", 85.0);
+        analysis.put("rigorous", 82.0);
+        analysis.put("confidence", 80.0);
+        analysis.put("shelf_life_days", 8);
+        analysis.put("disease_risk", "Medium");
+        analysis.put("recommendations", java.util.Arrays.asList(
+            "Standard quality - monitor regularly",
+            "Maintain optimal storage conditions",
+            "Regular quality checks recommended"
+        ));
+        analysis.put("timestamp", java.time.LocalDateTime.now().toString());
+        
+        return analysis;
+    }
+}

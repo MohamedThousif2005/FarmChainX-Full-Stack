@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Access Denied - 403</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #d32f2f; }
+        .container { max-width: 600px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ Access Denied (403)</h1>
+        <p>You don't have permission to access this resource.</p>
+        <p>Please contact your administrator if you believe this is an error.</p>
+        <a th:href="@{/}" style="color: #2196f3; text-decoration: none;">Return to Home</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Backend
+backend/target/
+backend/.gradle/
+backend/build/
+backend/.env
+backend/*.jar
+backend/*.war
+backend/*.ear
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database (don't commit actual database files)
+*.db
+*.sqlite
+
+echo ".metadata/" >> .gitignore
+echo "*.class" >> .gitignore
+echo "bin/" >> .gitignore
+echo ".settings/" >> .gitignore
+echo ".project" >> .gitignore
+echo ".classpath" >> .gitignore
