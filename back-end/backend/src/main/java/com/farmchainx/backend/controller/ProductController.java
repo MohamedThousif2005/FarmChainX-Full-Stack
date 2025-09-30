@@ -100,6 +100,32 @@ public class ProductController {
             );
         }
     }
+    @GetMapping("/images/{filename:.+}")
+    public ResponseEntity<byte[]> getImage(@PathVariable String filename) {
+        try {
+            Path filePath = Paths.get(UPLOAD_DIR).resolve(filename).normalize();
+            
+            // Check if file exists
+            if (!Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            byte[] imageBytes = Files.readAllBytes(filePath);
+            
+            String contentType = Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                    .body(imageBytes);
+                    
+        } catch (IOException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
     
     @GetMapping("/distributor/{distributorId}")
     public ResponseEntity<List<ProductDTO>> getDistributorProducts(@PathVariable Long distributorId) {

@@ -2,7 +2,9 @@ package com.farmchainx.backend.service;
 
 import com.farmchainx.backend.dto.ProductDTO;
 import com.farmchainx.backend.entity.Product;
+import com.farmchainx.backend.entity.User;
 import com.farmchainx.backend.repository.ProductRepository;
+import com.farmchainx.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,9 @@ public class ProductService {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     public Product addProduct(ProductDTO productDTO, Long distributorId) {
         Product product = new Product();
@@ -83,6 +88,20 @@ public class ProductService {
         dto.setImageUrl(product.getImageUrl());
         dto.setIsAvailable(product.getIsAvailable());
         dto.setDistributorId(product.getDistributorId());
+        
+        // Get distributor name
+        if (product.getDistributor() != null) {
+            dto.setDistributorName(product.getDistributor().getFullName());
+        } else {
+            // Fallback: get distributor name from repository
+            User distributor = userRepository.findById(product.getDistributorId()).orElse(null);
+            if (distributor != null) {
+                dto.setDistributorName(distributor.getFullName());
+            } else {
+                dto.setDistributorName("Unknown Distributor");
+            }
+        }
+        
         return dto;
     }
 }
