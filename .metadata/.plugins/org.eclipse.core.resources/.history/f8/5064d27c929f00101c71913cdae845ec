@@ -1,0 +1,38 @@
+package com.farmchainx.backend.repository;
+
+import com.farmchainx.backend.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    
+    Optional<User> findByEmail(String email);
+    
+    boolean existsByEmail(String email);
+    
+    List<User> findByRole(String role);
+    
+    long countByRole(String role);
+    
+    // FIX: Add these methods for admin approval system
+    List<User> findByApprovedFalse();
+    
+    List<User> findByApprovedTrue();
+    
+    long countByApprovedFalse();
+    
+    long countByApprovedTrue();
+    
+    List<User> findByRoleAndApproved(String role, Boolean approved);
+    
+    long countByRoleAndApproved(String role, Boolean approved);
+    
+    // FIX: Add method to find users by approval status with role
+    @Query("SELECT u FROM User u WHERE u.approved = :approved ORDER BY u.registrationDate DESC")
+    List<User> findByApprovalStatus(boolean approved);
+}

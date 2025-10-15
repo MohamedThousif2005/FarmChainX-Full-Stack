@@ -1,0 +1,139 @@
+package com.farmchainx.backend.service;
+
+import com.farmchainx.backend.dto.ProductDTO;
+import com.farmchainx.backend.entity.Product;
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.repository.ProductRepository;
+import com.farmchainx.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class ProductService {
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public Product addProduct(ProductDTO productDTO, Long distributorId) {
+        Product product = new Product();
+        product.setName(productDTO.getName());
+        product.setDescription(productDTO.getDescription());
+        product.setCategory(productDTO.getCategory());
+        product.setPrice(productDTO.getPrice());
+        product.setQuantity(productDTO.getQuantity());
+        product.setUnit(productDTO.getUnit());
+        product.setImageUrl(productDTO.getImageUrl());
+        product.setDistributorId(distributorId);
+        product.setIsAvailable(productDTO.getQuantity() > 0);
+        
+        return productRepository.save(product);
+    }
+
+    public List<ProductDTO> getProductsByDistributor(Long distributorId) {
+        List<Product> products = productRepository.findByDistributorId(distributorId);
+        return products.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ProductDTO> getAllAvailableProducts() {
+        List<Product> products = productRepository.findByIsAvailableTrue();
+        return products.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public Product updateProduct(Long productId, ProductDTO productDTO) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+        
+        System.out.println("🔄 Updating product: " + productId);
+        System.out.println("📝 New data - Name: " + productDTO.getName() + ", Price: " + productDTO.getPrice());
+        
+        product.setName(productDTO.getName());
+        product.setDescription(productDTO.getDescription());
+        product.setCategory(productDTO.getCategory());
+        product.setPrice(productDTO.getPrice());
+        product.setQuantity(productDTO.getQuantity());
+        product.setUnit(productDTO.getUnit());
+        
+        // Only update image if provided (not null and not empty)
+        if (productDTO.getImageUrl() != null && !productDTO.getImageUrl().isEmpty()) {
+            System.out.println("🖼️ Updating image to: " + productDTO.getImageUrl());
+            product.setImageUrl(productDTO.getImageUrl());
+        } else {
+            System.out.println("ℹ️ Keeping existing image: " + product.getImageUrl());
+        }
+        
+        product.setIsAvailable(productDTO.getQuantity() > 0);
+        
+        Product savedProduct = productRepository.save(product);
+        System.out.println("✅ Product updated successfully: " + savedProduct.getId());
+        
+        return savedProduct;
+    }
+
+    @Transactional
+    public String deleteProduct(Long productId) {
+        try {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+            
+            boolean hasOrders = productRepository.hasOrderItems(productId);
+            
+            if (hasOrders) {
+                product.setIsAvailable(false);
+                product.setQuantity(0);
+                productRepository.save(product);
+                return "Product has existing orders. Marked as unavailable instead of deleting.";
+            } else {
+                productRepository.delete(product);
+                return "Product deleted successfully";
+            }
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete product: " + e.getMessage());
+        }
+    }
+
+    public ProductDTO getProductById(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+        return convertToDTO(product);
+    }
+
+    private ProductDTO convertToDTO(Product product) {
+        ProductDTO dto = new ProductDTO();
+        dto.setId(product.getId());
+        dto.setName(product.getName());
+        dto.setDescription(product.getDescription());
+        dto.setCategory(product.getCategory());
+        dto.setPrice(product.getPrice());
+        dto.setQuantity(product.getQuantity());
+        dto.setUnit(product.getUnit());
+        dto.setImageUrl(product.getImageUrl());
+        dto.setIsAvailable(product.getIsAvailable());
+        dto.setDistributorId(product.getDistributorId());
+        
+        // Get distributor name
+        if (product.getDistributor() != null) {
+            dto.setDistributorName(product.getDistributor().getFullName());
+        } else {
+            User distributor = userRepository.findById(product.getDistributorId()).orElse(null);
+            if (distributor != null) {
+                dto.setDistributorName(distributor.getFullName());
+            } else {
+                dto.setDistributorName("Unknown Distributor");
+            }
+        }
+        
+        return dto;
+    }
+}

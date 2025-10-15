@@ -1,0 +1,107 @@
+package com.farmchainx.backend.controller;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/admin")
+@CrossOrigin(origins = "*")
+public class AdminController {
+
+    @Autowired
+    private UserService userService;
+
+    // Simple health check
+    @GetMapping("/health")
+    public Map<String, Object> healthCheck() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Admin Service");
+        response.put("timestamp", System.currentTimeMillis());
+        response.put("message", "Admin endpoints are working");
+        return response;
+    }
+
+    // Get all users - SIMPLE VERSION
+    @GetMapping("/users")
+    public List<User> getAllUsers() {
+        System.out.println("=== GET ALL USERS ENDPOINT CALLED ===");
+        List<User> users = userService.getAllUsers();
+        System.out.println("Returning " + users.size() + " users");
+        return users; // Return raw list
+    }
+
+    // Get user stats - FIXED VERSION
+    @GetMapping("/stats")
+    public Map<String, Object> getUserStats() {
+        Map<String, Long> userStats = userService.getUserStats();
+        Map<String, Object> response = new HashMap<>();
+        
+        // Copy all stats to response
+        response.putAll(userStats);
+        response.put("status", "success");
+        response.put("timestamp", System.currentTimeMillis());
+        
+        return response;
+    }
+
+    // Test endpoint with different response formats
+    @GetMapping("/test-users")
+    public Object testUsers(@RequestParam(defaultValue = "false") boolean raw) {
+        List<User> users = userService.getAllUsers();
+        
+        if (raw) {
+            return users; // Return raw array
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("users", users);
+            response.put("count", users.size());
+            response.put("status", "success");
+            return response;
+        }
+    }
+
+    // Simple endpoint for pending approvals (always empty since auto-approved)
+    @GetMapping("/pending-approvals")
+    public List<User> getPendingApprovals() {
+        return userService.getPendingApprovals();
+    }
+
+    // Approve user endpoint
+    @PostMapping("/approve-user/{userId}")
+    public Map<String, Object> approveUser(@PathVariable Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            User user = userService.approveUser(userId);
+            response.put("status", "success");
+            response.put("message", "User approved successfully");
+            response.put("user", user);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+        }
+        return response;
+    }
+
+    // Reject user endpoint
+    @DeleteMapping("/reject-user/{userId}")
+    public Map<String, Object> rejectUser(@PathVariable Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            userService.rejectUser(userId);
+            response.put("status", "success");
+            response.put("message", "User rejected successfully");
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+        }
+        return response;
+    }
+}

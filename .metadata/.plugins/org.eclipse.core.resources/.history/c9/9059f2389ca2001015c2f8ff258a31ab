@@ -1,0 +1,126 @@
+package com.farmchainx.backend.controller;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.farmchainx.backend.dto.CropDTO;
+import com.farmchainx.backend.dto.DashboardStatsDTO;
+import com.farmchainx.backend.service.CropService;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+@RestController
+@RequestMapping("/api/farmer")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "*"})
+public class CropController {
+
+    @Autowired
+    private CropService cropService;
+
+    @GetMapping("/crops")
+    public ResponseEntity<List<CropDTO>> getFarmerCrops(HttpServletRequest request) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            List<CropDTO> crops = cropService.getCropsByUserId(userId);
+            return ResponseEntity.ok(crops);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @GetMapping("/crops/status/{status}")
+    public ResponseEntity<List<CropDTO>> getFarmerCropsByStatus(
+            HttpServletRequest request, 
+            @PathVariable String status) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            List<CropDTO> crops = cropService.getCropsByUserIdAndStatus(userId, status);
+            return ResponseEntity.ok(crops);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @PostMapping("/crops")
+    public ResponseEntity<?> addCrop(
+            HttpServletRequest request,
+            @RequestBody CropDTO cropDTO) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            CropDTO savedCrop = cropService.addCrop(userId, cropDTO);
+            return ResponseEntity.ok(savedCrop);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/crops/{cropId}/status")
+    public ResponseEntity<?> updateCropStatus(
+            HttpServletRequest request,
+            @PathVariable Long cropId,
+            @RequestBody Map<String, String> statusUpdate) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            String status = statusUpdate.get("status");
+            CropDTO updatedCrop = cropService.updateCropStatus(cropId, status, userId);
+            return ResponseEntity.ok(updatedCrop);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/crops/{cropId}")
+    public ResponseEntity<?> deleteCrop(
+            HttpServletRequest request,
+            @PathVariable Long cropId) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            cropService.deleteCrop(cropId, userId);
+            return ResponseEntity.ok().body(Map.of("message", "Crop deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/crops/{cropId}")
+    public ResponseEntity<?> getCropById(
+            HttpServletRequest request,
+            @PathVariable Long cropId) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            CropDTO crop = cropService.getCropById(cropId, userId);
+            return ResponseEntity.ok(crop);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats(HttpServletRequest request) {
+        try {
+            Long userId = getUserIdFromRequest(request);
+            DashboardStatsDTO stats = cropService.getDashboardStats(userId);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    // Helper method to extract user ID from request
+    private Long getUserIdFromRequest(HttpServletRequest request) {
+        // This is a simplified implementation
+        // In a real application, you'd extract user ID from JWT token
+        String userIdHeader = request.getHeader("X-User-ID");
+        if (userIdHeader != null) {
+            return Long.parseLong(userIdHeader);
+        }
+        
+        // For demo purposes, return a default user ID
+        // You should replace this with proper JWT token parsing
+        return 1L; // Default user ID
+    }
+}

@@ -15,7 +15,7 @@ A full-stack application for managing agricultural supply chain with React front
 3. Run: `mvn spring-boot:run`
 
 ### Frontend
-1. Navigate to `frontend/`
+1. Navigate to `front-end/farmchainxx`
 2. Run: `npm install`
 3. Run: `npm run dev`
 

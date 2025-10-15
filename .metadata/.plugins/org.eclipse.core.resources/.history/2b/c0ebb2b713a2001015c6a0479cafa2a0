@@ -1,0 +1,31 @@
+package com.farmchainx.backend.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/test")
+@CrossOrigin(origins = "*")
+public class TestController {
+
+    @GetMapping("/status")
+    public Map<String, Object> testStatus() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Test Controller");
+        response.put("timestamp", System.currentTimeMillis());
+        response.put("message", "Backend is running properly");
+        return response;
+    }
+
+    @GetMapping("/users")
+    public Map<String, Object> testUsers() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("test", true);
+        response.put("message", "Users endpoint is accessible");
+        response.put("timestamp", System.currentTimeMillis());
+        return response;
+    }
+}

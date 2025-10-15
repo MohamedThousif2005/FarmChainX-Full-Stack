@@ -1,0 +1,230 @@
+package com.farmchainx.backend.service;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+@Transactional
+public class UserService {
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserService.class);
+    
+    public boolean emailExists(String email) {
+        return userRepository.existsByEmail(email);
+    }
+    
+    public User createUser(User user) {
+        // Ensure role consistency
+        if ("FAWBER".equals(user.getRole())) {
+            user.setRole("FARMER");
+        } else if ("CONSUME".equals(user.getRole())) {
+            user.setRole("CONSUMER");
+        }
+        
+        // NEW: Set approval status to false for new users (except ADMIN)
+        if (!"ADMIN".equals(user.getRole())) {
+            user.setApproved(false);
+        } else {
+            user.setApproved(true); // Auto-approve admin users
+        }
+        
+        // Set registration date
+        user.setRegistrationDate(LocalDateTime.now());
+        
+        User savedUser = userRepository.save(user);
+        logger.info("New user registered - ID: {}, Email: {}, Role: {}, Approved: {}", 
+            savedUser.getId(), savedUser.getEmail(), savedUser.getRole(), savedUser.getApproved());
+        
+        return savedUser;
+    }
+    
+    public Optional<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+    
+    public User updateUser(User user) {
+        // Ensure role consistency before updating
+        if ("FAWBER".equals(user.getRole())) {
+            user.setRole("FARMER");
+        } else if ("CONSUME".equals(user.getRole())) {
+            user.setRole("CONSUMER");
+        }
+        
+        return userRepository.save(user);
+    }
+    
+    public List<User> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        logger.info("Retrieved {} users from database", users.size());
+        
+        for (User user : users) {
+            logger.debug("User ID: {}, Email: {}, FullName: {}, Role: {}, Approved: {}", 
+                user.getId(), user.getEmail(), user.getFullName(), user.getRole(), user.getApproved());
+        }
+        
+        return users;
+    }
+    
+    // NEW: Get pending approvals (users with approved = false)
+    public List<User> getPendingApprovals() {
+        List<User> pendingUsers = userRepository.findByApprovedFalse();
+        logger.info("Found {} users pending approval", pendingUsers.size());
+        
+        for (User user : pendingUsers) {
+            logger.debug("Pending User - ID: {}, Email: {}, Role: {}", 
+                user.getId(), user.getEmail(), user.getRole());
+        }
+        
+        return pendingUsers;
+    }
+    
+    // UPDATED: Actually approve the user
+    public User approveUser(Long userId) {
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            user.setApproved(true);
+            user.setApprovalDate(LocalDateTime.now());
+            
+            User approvedUser = userRepository.save(user);
+            logger.info("User approved - ID: {}, Email: {}, Role: {}", 
+                approvedUser.getId(), approvedUser.getEmail(), approvedUser.getRole());
+            
+            return approvedUser;
+        } else {
+            logger.warn("User not found for approval - ID: {}", userId);
+            return null;
+        }
+    }
+    
+    // UPDATED: Reject user (delete from database)
+    public boolean rejectUser(Long userId) {
+        try {
+            Optional<User> userOptional = userRepository.findById(userId);
+            if (userOptional.isPresent()) {
+                User user = userOptional.get();
+                
+                if ("ADMIN".equals(user.getRole())) {
+                    logger.warn("Attempt to delete admin user - ID: {}", userId);
+                    throw new RuntimeException("Cannot delete admin users");
+                }
+                
+                userRepository.delete(user);
+                logger.info("User rejected and deleted - ID: {}, Email: {}", user.getId(), user.getEmail());
+                return true;
+            } else {
+                logger.warn("User not found for rejection - ID: {}", userId);
+                return false;
+            }
+            
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error rejecting user - ID: {}, Error: {}", userId, e.getMessage());
+            throw new RuntimeException("Error deleting user: " + e.getMessage());
+        }
+    }
+    
+    public Map<String, Long> getUserStats() {
+        try {
+            Map<String, Long> stats = new HashMap<>();
+            
+            stats.put("totalUsers", userRepository.count());
+            stats.put("pendingApprovals", userRepository.countByApprovedFalse());
+            stats.put("approvedUsers", userRepository.countByApprovedTrue());
+            
+            // Use the repository methods for counting
+            long farmers = userRepository.countByRole("FARMER");
+            long distributors = userRepository.countByRole("DISTRIBUTOR");
+            long consumers = userRepository.countByRole("CONSUMER");
+            long admins = userRepository.countByRole("ADMIN");
+            
+            stats.put("totalFarmers", farmers);
+            stats.put("totalDistributors", distributors);
+            stats.put("totalConsumers", consumers);
+            stats.put("totalAdmins", admins);
+            
+            logger.debug("User stats generated - Total: {}, Pending: {}, Approved: {}", 
+                stats.get("totalUsers"), stats.get("pendingApprovals"), stats.get("approvedUsers"));
+            
+            return stats;
+            
+        } catch (Exception e) {
+            logger.error("Error generating detailed stats, using fallback: {}", e.getMessage());
+            
+            Map<String, Long> fallbackStats = new HashMap<>();
+            List<User> allUsers = userRepository.findAll();
+            
+            fallbackStats.put("totalUsers", (long) allUsers.size());
+            fallbackStats.put("pendingApprovals", allUsers.stream()
+                .filter(u -> !u.getApproved()).count());
+            fallbackStats.put("approvedUsers", allUsers.stream()
+                .filter(u -> u.getApproved()).count());
+            
+            fallbackStats.put("totalFarmers", allUsers.stream()
+                .filter(u -> "FARMER".equals(u.getRole())).count());
+            fallbackStats.put("totalDistributors", allUsers.stream()
+                .filter(u -> "DISTRIBUTOR".equals(u.getRole())).count());
+            fallbackStats.put("totalConsumers", allUsers.stream()
+                .filter(u -> "CONSUMER".equals(u.getRole())).count());
+            fallbackStats.put("totalAdmins", allUsers.stream()
+                .filter(u -> "ADMIN".equals(u.getRole())).count());
+            
+            return fallbackStats;
+        }
+    }
+    
+    public long countUsers() {
+        return userRepository.count();
+    }
+    
+    // NEW: Count pending users
+    public long countPendingUsers() {
+        return userRepository.countByApprovedFalse();
+    }
+    
+    public Optional<User> getUserById(Long userId) {
+        return userRepository.findById(userId);
+    }
+    
+    // NEW: Count approved users
+    public long countApprovedUsers() {
+        return userRepository.countByApprovedTrue();
+    }
+    
+    public List<User> getUsersByRole(String role) {
+        List<User> users = userRepository.findByRole(role);
+        users.forEach(user -> {
+            if ("FAWBER".equals(user.getRole())) {
+                user.setRole("FARMER");
+            } else if ("CONSUME".equals(user.getRole())) {
+                user.setRole("CONSUMER");
+            }
+        });
+        return users;
+    }
+
+    // ADD THIS MISSING METHOD:
+    public void resetAllUsersToPending() {
+        List<User> allUsers = userRepository.findAll();
+        for (User user : allUsers) {
+            if (!"ADMIN".equals(user.getRole())) {
+                user.setApproved(false);
+                userRepository.save(user);
+                logger.info("Reset user to pending: {}", user.getEmail());
+            }
+        }
+    }
+}

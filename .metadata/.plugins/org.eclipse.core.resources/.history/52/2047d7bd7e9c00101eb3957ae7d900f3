@@ -1,5 +1,0 @@
-package com.farmchainx.backend.config;
-
-public class RestTemplateConfig {
-
-}

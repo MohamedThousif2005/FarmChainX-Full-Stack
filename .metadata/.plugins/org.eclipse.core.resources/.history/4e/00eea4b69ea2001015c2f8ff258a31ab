@@ -1,0 +1,73 @@
+package com.farmchainx.backend.controller;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/direct")
+@CrossOrigin(origins = "*")
+public class DirectDatabaseController {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @GetMapping("/all-users")
+    public ResponseEntity<Map<String, Object>> getAllUsersDirect() {
+        try {
+            List<User> users = userRepository.findAll();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Direct database access successful");
+            response.put("count", users.size());
+            response.put("users", users);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            System.out.println("=== DIRECT DATABASE ACCESS ===");
+            System.out.println("Retrieved " + users.size() + " users from database");
+            for (User user : users) {
+                System.out.println("User: ID=" + user.getId() + 
+                                 ", Email=" + user.getEmail() + 
+                                 ", Name=" + user.getFullName() + 
+                                 ", Role=" + user.getRole());
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.out.println("Direct database error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Direct database access failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/user-count")
+    public ResponseEntity<Map<String, Object>> getUserCount() {
+        try {
+            long count = userRepository.count();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("count", count);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            System.out.println("User count: " + count);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Count failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+}

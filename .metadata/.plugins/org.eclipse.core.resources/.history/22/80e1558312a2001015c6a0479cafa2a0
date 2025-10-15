@@ -1,0 +1,171 @@
+package com.farmchainx.backend.controller;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/admin")
+@CrossOrigin(origins = "*")
+public class AdminController {
+
+    @Autowired
+    private UserService userService;
+
+    @GetMapping("/health")
+    public ResponseEntity<?> healthCheck() {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "OK");
+            response.put("service", "Admin Controller");
+            response.put("database", "Connected");
+            response.put("timestamp", java.time.LocalDateTime.now().toString());
+            response.put("totalUsers", userService.countUsers());
+            
+            // Add detailed stats to health check
+            Map<String, Long> stats = userService.getUserStats();
+            response.putAll(stats);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "ERROR");
+            errorResponse.put("message", "Health check failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/user-stats")
+    public ResponseEntity<?> getUserStats() {
+        try {
+            Map<String, Long> stats = userService.getUserStats();
+            
+            // Add additional metadata
+            stats.put("timestamp", System.currentTimeMillis());
+            stats.put("status", "success");
+            
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get user stats: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/pending-approvals")
+    public ResponseEntity<?> getPendingApprovals() {
+        try {
+            List<User> pendingUsers = userService.getPendingApprovals();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("users", pendingUsers);
+            response.put("count", pendingUsers.size());
+            response.put("timestamp", System.currentTimeMillis());
+            response.put("status", "success");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get pending approvals: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/all-users")
+    public ResponseEntity<?> getAllUsers() {
+        try {
+            List<User> users = userService.getAllUsers();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("users", users);
+            response.put("count", users.size());
+            response.put("timestamp", System.currentTimeMillis());
+            response.put("status", "success");
+            
+            return ResponseEntity.ok(users); // Return raw list for easier parsing in frontend
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get all users: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @PostMapping("/approve-user/{userId}")
+    public ResponseEntity<?> approveUser(@PathVariable Long userId) {
+        try {
+            User user = userService.approveUser(userId);
+            if (user != null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "User approved successfully");
+                response.put("user", user);
+                response.put("timestamp", System.currentTimeMillis());
+                response.put("status", "success");
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "User not found with ID: " + userId);
+                errorResponse.put("timestamp", System.currentTimeMillis());
+                errorResponse.put("status", "error");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to approve user: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @DeleteMapping("/reject-user/{userId}")
+    public ResponseEntity<?> rejectUser(@PathVariable Long userId) {
+        try {
+            userService.rejectUser(userId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "User rejected and deleted successfully");
+            response.put("timestamp", System.currentTimeMillis());
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to reject user: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+    
+    @GetMapping("/users-by-role/{role}")
+    public ResponseEntity<?> getUsersByRole(@PathVariable String role) {
+        try {
+            List<User> users = userService.getUsersByRole(role.toUpperCase());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("users", users);
+            response.put("count", users.size());
+            response.put("role", role.toUpperCase());
+            response.put("timestamp", System.currentTimeMillis());
+            response.put("status", "success");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get users by role: " + e.getMessage());
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            errorResponse.put("status", "error");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+}

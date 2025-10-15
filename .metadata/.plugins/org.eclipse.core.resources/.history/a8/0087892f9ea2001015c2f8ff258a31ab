@@ -1,0 +1,227 @@
+package com.farmchainx.backend.service;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+@Transactional
+public class UserService {
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserService.class);
+    
+    public boolean emailExists(String email) {
+        return userRepository.existsByEmail(email);
+    }
+    
+    public User createUser(User user) {
+        // Ensure role consistency
+        if ("FAWBER".equals(user.getRole())) {
+            user.setRole("FARMER");
+        } else if ("CONSUME".equals(user.getRole())) {
+            user.setRole("CONSUMER");
+        }
+        
+        // Auto-approve all users
+        user.setApproved(true);
+        
+        User savedUser = userRepository.save(user);
+        logger.info("User created: ID={}, Email={}, Role={}", savedUser.getId(), savedUser.getEmail(), savedUser.getRole());
+        return savedUser;
+    }
+    
+    public Optional<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+    
+    public User updateUser(User user) {
+        // Ensure role consistency before updating
+        if ("FAWBER".equals(user.getRole())) {
+            user.setRole("FARMER");
+        } else if ("CONSUME".equals(user.getRole())) {
+            user.setRole("CONSUMER");
+        }
+        
+        User updatedUser = userRepository.save(user);
+        logger.info("User updated: ID={}, Email={}, Role={}", updatedUser.getId(), updatedUser.getEmail(), updatedUser.getRole());
+        return updatedUser;
+    }
+    
+    public List<User> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        logger.info("Retrieved {} users from database", users.size());
+        
+        // Log detailed user information for debugging
+        for (User user : users) {
+            logger.info("User - ID: {}, Email: {}, FullName: {}, Role: {}, Approved: {}, Phone: {}, Address: {}", 
+                user.getId(), user.getEmail(), user.getFullName(), user.getRole(), user.getApproved(), user.getPhone(), user.getAddress());
+        }
+        
+        return users;
+    }
+    
+    public List<User> getPendingApprovals() {
+        // Since all users are auto-approved, this will return empty list
+        List<User> pendingUsers = List.of();
+        logger.info("No pending approvals - all users are auto-approved");
+        return pendingUsers;
+    }
+    
+    public User approveUser(Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+            
+            if (!user.getApproved()) {
+                user.setApproved(true);
+                User approvedUser = userRepository.save(user);
+                logger.info("User approved: ID={}, Email={}", approvedUser.getId(), approvedUser.getEmail());
+                return approvedUser;
+            }
+            
+            logger.info("User already approved: ID={}, Email={}", user.getId(), user.getEmail());
+            return user;
+            
+        } catch (Exception e) {
+            logger.error("Error approving user ID {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Error approving user: " + e.getMessage());
+        }
+    }
+    
+    public void rejectUser(Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+            
+            if ("ADMIN".equals(user.getRole())) {
+                throw new RuntimeException("Cannot delete admin users");
+            }
+            
+            userRepository.delete(user);
+            logger.info("User deleted successfully: ID={}, Email={}", user.getId(), user.getEmail());
+            
+        } catch (RuntimeException e) {
+            logger.error("Error rejecting user ID {}: {}", userId, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            logger.error("Unexpected error rejecting user ID {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Error deleting user: " + e.getMessage());
+        }
+    }
+    
+    public Map<String, Long> getUserStats() {
+        try {
+            Map<String, Long> stats = new HashMap<>();
+            
+            long totalUsers = userRepository.count();
+            stats.put("totalUsers", totalUsers);
+            stats.put("pendingApprovals", 0L); // No pending approvals
+            stats.put("approvedUsers", totalUsers); // All users are approved
+            
+            // Use the repository methods for counting
+            long farmers = userRepository.countByRole("FARMER");
+            long distributors = userRepository.countByRole("DISTRIBUTOR");
+            long consumers = userRepository.countByRole("CONSUMER");
+            long admins = userRepository.countByRole("ADMIN");
+            
+            stats.put("totalFarmers", farmers);
+            stats.put("totalDistributors", distributors);
+            stats.put("totalConsumers", consumers);
+            stats.put("totalAdmins", admins);
+            
+            logger.info("User stats generated - Total: {}, Farmers: {}, Distributors: {}, Consumers: {}, Admins: {}", 
+                totalUsers, farmers, distributors, consumers, admins);
+            
+            return stats;
+            
+        } catch (Exception e) {
+            logger.error("Error generating detailed stats, using fallback: {}", e.getMessage());
+            
+            // Fallback to manual counting
+            Map<String, Long> fallbackStats = new HashMap<>();
+            List<User> allUsers = userRepository.findAll();
+            
+            fallbackStats.put("totalUsers", (long) allUsers.size());
+            fallbackStats.put("pendingApprovals", 0L);
+            fallbackStats.put("approvedUsers", (long) allUsers.size());
+            
+            fallbackStats.put("totalFarmers", allUsers.stream()
+                .filter(u -> "FARMER".equals(u.getRole())).count());
+            fallbackStats.put("totalDistributors", allUsers.stream()
+                .filter(u -> "DISTRIBUTOR".equals(u.getRole())).count());
+            fallbackStats.put("totalConsumers", allUsers.stream()
+                .filter(u -> "CONSUMER".equals(u.getRole())).count());
+            fallbackStats.put("totalAdmins", allUsers.stream()
+                .filter(u -> "ADMIN".equals(u.getRole())).count());
+            
+            logger.warn("Using fallback stats due to error: {}", e.getMessage());
+            return fallbackStats;
+        }
+    }
+    
+    public long countUsers() {
+        long count = userRepository.count();
+        logger.debug("Total user count: {}", count);
+        return count;
+    }
+    
+    public long countPendingUsers() {
+        return 0; // No pending users
+    }
+    
+    public Optional<User> getUserById(Long userId) {
+        Optional<User> user = userRepository.findById(userId);
+        logger.debug("User lookup by ID {}: {}", userId, user.isPresent() ? "Found" : "Not found");
+        return user;
+    }
+    
+    public long countApprovedUsers() {
+        return userRepository.count(); // All users are approved
+    }
+    
+    public List<User> getUsersByRole(String role) {
+        String normalizedRole = normalizeRole(role);
+        List<User> users = userRepository.findByRole(normalizedRole);
+        
+        // Ensure role consistency in response
+        users.forEach(user -> {
+            if ("FAWBER".equals(user.getRole())) {
+                user.setRole("FARMER");
+            } else if ("CONSUME".equals(user.getRole())) {
+                user.setRole("CONSUMER");
+            }
+        });
+        
+        logger.info("Retrieved {} users with role: {}", users.size(), normalizedRole);
+        return users;
+    }
+    
+    private String normalizeRole(String role) {
+        if (role == null) return "UNKNOWN";
+        
+        switch (role.toUpperCase()) {
+            case "FARMER":
+            case "FAWBER":
+                return "FARMER";
+            case "DISTRIBUTOR":
+                return "DISTRIBUTOR";
+            case "CONSUMER":
+            case "CONSUME":
+                return "CONSUMER";
+            case "ADMIN":
+                return "ADMIN";
+            default:
+                return role.toUpperCase();
+        }
+    }
+}

@@ -1,0 +1,250 @@
+package com.farmchainx.backend.controller;
+
+import com.farmchainx.backend.entity.User;
+import com.farmchainx.backend.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
+public class AuthController {
+    
+    private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    public AuthController(UserService userService, PasswordEncoder passwordEncoder) {
+        this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
+        try {
+            System.out.println("=== REGISTRATION ATTEMPT ===");
+            System.out.println("Email: " + user.getEmail());
+            System.out.println("Full Name: " + user.getFullName());
+            System.out.println("Role: " + user.getRole());
+            
+            if (userService.emailExists(user.getEmail())) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Email already exists");
+                response.put("code", "EMAIL_EXISTS");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            User newUser = new User();
+            newUser.setFullName(user.getFullName());
+            newUser.setEmail(user.getEmail());
+            
+            // ENCODE PASSWORD
+            String encodedPassword = passwordEncoder.encode(user.getPassword());
+            newUser.setPassword(encodedPassword);
+            
+            newUser.setRole(user.getRole());
+            
+            // FIX: FORCE ALL NEW USERS TO PENDING APPROVAL
+            newUser.setApproved(false);
+            newUser.setRegistrationDate(LocalDateTime.now());
+            
+            // Set optional fields
+            if (user.getPhone() != null) newUser.setPhone(user.getPhone());
+            if (user.getAddress() != null) newUser.setAddress(user.getAddress());
+            if (user.getFarmName() != null) newUser.setFarmName(user.getFarmName());
+            if (user.getFarmSize() != null) newUser.setFarmSize(user.getFarmSize());
+            if (user.getCompanyName() != null) newUser.setCompanyName(user.getCompanyName());
+            if (user.getDeliveryArea() != null) newUser.setDeliveryArea(user.getDeliveryArea());
+            if (user.getPreferences() != null) newUser.setPreferences(user.getPreferences());
+            
+            User createdUser = userService.createUser(newUser);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Registration successful! Your account is pending admin approval. You will be able to login once approved.");
+            response.put("user", createdUser);
+            response.put("status", "success");
+            response.put("approved", false); // Always false for new registrations
+            
+            System.out.println("=== REGISTRATION SUCCESSFUL - PENDING APPROVAL ===");
+            System.out.println("User: " + user.getEmail());
+            System.out.println("Approval Status: PENDING");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.out.println("Registration error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Registration failed: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @PostMapping("/login")
+    public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+        try {
+            System.out.println("=== LOGIN ATTEMPT ===");
+            System.out.println("Email: " + loginRequest.getEmail());
+            
+            User user = userService.getUserByEmail(loginRequest.getEmail())
+                    .orElseThrow(() -> {
+                        System.out.println("User not found: " + loginRequest.getEmail());
+                        return new RuntimeException("Invalid email or password");
+                    });
+            
+            System.out.println("User found: " + user.getEmail());
+            System.out.println("Approved status: " + user.getApproved());
+            System.out.println("Role: " + user.getRole());
+            
+            // Check password match
+            boolean passwordMatches = passwordEncoder.matches(loginRequest.getPassword(), user.getPassword());
+            System.out.println("Password matches: " + passwordMatches);
+            
+            if (!passwordMatches) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Invalid email or password");
+                response.put("code", "INVALID_CREDENTIALS");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // FIX: Check if user is approved - ALL users need approval
+            if (!user.getApproved()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Your account is pending admin approval. Please wait for approval before logging in.");
+                response.put("code", "PENDING_APPROVAL");
+                response.put("message", "Admin approval required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Map<String, Object> userResponse = new HashMap<>();
+            userResponse.put("id", user.getId());
+            userResponse.put("fullName", user.getFullName());
+            userResponse.put("email", user.getEmail());
+            userResponse.put("role", user.getRole());
+            userResponse.put("approved", user.getApproved());
+            userResponse.put("phone", user.getPhone());
+            userResponse.put("address", user.getAddress());
+            userResponse.put("farmName", user.getFarmName());
+            userResponse.put("farmSize", user.getFarmSize());
+            userResponse.put("companyName", user.getCompanyName());
+            userResponse.put("deliveryArea", user.getDeliveryArea());
+            userResponse.put("preferences", user.getPreferences());
+            userResponse.put("registrationDate", user.getRegistrationDate());
+            userResponse.put("approvalDate", user.getApprovalDate());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Login successful");
+            response.put("user", userResponse);
+            response.put("role", user.getRole());
+            response.put("status", "success");
+            
+            System.out.println("=== LOGIN SUCCESSFUL ===");
+            System.out.println("User: " + user.getEmail());
+            System.out.println("Role: " + user.getRole());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.out.println("Login error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Login failed: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @GetMapping("/status")
+    public ResponseEntity<?> authStatus() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Auth Controller");
+        response.put("timestamp", LocalDateTime.now().toString());
+        response.put("message", "Auth service is running with STRICT admin approval system");
+        response.put("approvalRequired", true);
+        return ResponseEntity.ok(response);
+    }
+    
+    // FIX: Add endpoint to reset existing users to pending (one-time use)
+    @PostMapping("/reset-to-pending")
+    public ResponseEntity<?> resetUsersToPending() {
+        try {
+            userService.resetAllUsersToPending(); // This method now exists
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "All existing users have been reset to pending approval status");
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to reset users: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    @PostMapping("/create-test-user")
+    public ResponseEntity<?> createTestUser() {
+        try {
+            String email = "test@farmchainx.com";
+            if (!userService.emailExists(email)) {
+                User testUser = new User();
+                testUser.setFullName("Test User");
+                testUser.setEmail(email);
+                testUser.setPassword(passwordEncoder.encode("password123"));
+                testUser.setRole("FARMER");
+                testUser.setApproved(false); // Set to false - requires approval
+                testUser.setPhone("1234567890");
+                testUser.setAddress("Test Address");
+                testUser.setFarmName("Test Farm");
+                testUser.setFarmSize("10 acres");
+                
+                User createdUser = userService.createUser(testUser);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "Test user created successfully - PENDING ADMIN APPROVAL");
+                response.put("user", createdUser);
+                response.put("credentials", "test@farmchainx.com / password123");
+                response.put("approved", false);
+                response.put("status", "success");
+                return ResponseEntity.ok(response);
+            } else {
+                // Update existing test user to pending
+                User existingUser = userService.getUserByEmail(email).get();
+                existingUser.setApproved(false);
+                userService.updateUser(existingUser);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "Test user already exists - reset to PENDING APPROVAL");
+                response.put("credentials", "test@farmchainx.com / password123");
+                response.put("approved", false);
+                response.put("status", "success");
+                return ResponseEntity.ok(response);
+            }
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to create test user: " + e.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    public static class LoginRequest {
+        private String email;
+        private String password;
+        
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+    }
+}
