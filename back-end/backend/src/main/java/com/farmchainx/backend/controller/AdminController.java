@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://localhost:5174"})
 public class AdminController {
 
     @Autowired
@@ -65,9 +65,21 @@ public class AdminController {
     public ResponseEntity<?> getAllUsers() {
         try {
             List<User> users = userService.getAllUsers();
-            return ResponseEntity.ok(users);
+            
+            // Create response with user data (excluding passwords)
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "SUCCESS");
+            response.put("message", "Users retrieved successfully");
+            response.put("users", users);
+            response.put("count", users.size());
+            response.put("timestamp", java.time.LocalDateTime.now().toString());
+            
+            System.out.println("✅ Admin: Retrieved " + users.size() + " users from database");
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
+            System.out.println("❌ Admin: Error retrieving users: " + e.getMessage());
             Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "ERROR");
             errorResponse.put("error", "Failed to get all users: " + e.getMessage());
             return ResponseEntity.internalServerError().body(errorResponse);
         }
@@ -104,6 +116,61 @@ public class AdminController {
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to reject user: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+    
+    // NEW: Test endpoint for admin dashboard
+    @GetMapping("/test")
+    public ResponseEntity<?> testEndpoint() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("service", "Admin Test Endpoint");
+        response.put("message", "Admin controller is working!");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        return ResponseEntity.ok(response);
+    }
+    
+    // NEW: Get users endpoint for admin dashboard
+    @GetMapping("/users")
+    public ResponseEntity<?> getUsersForAdmin() {
+        try {
+            List<User> users = userService.getAllUsers();
+            
+            // Format users for frontend (remove sensitive data)
+            List<Map<String, Object>> formattedUsers = users.stream().map(user -> {
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("id", user.getId());
+                userMap.put("fullName", user.getFullName());
+                userMap.put("email", user.getEmail());
+                userMap.put("role", user.getRole());
+                userMap.put("phone", user.getPhone());
+                userMap.put("address", user.getAddress());
+                userMap.put("approved", user.getApproved());
+                userMap.put("farmName", user.getFarmName());
+                userMap.put("farmSize", user.getFarmSize());
+                userMap.put("companyName", user.getCompanyName());
+                userMap.put("deliveryArea", user.getDeliveryArea());
+                userMap.put("preferences", user.getPreferences());
+                userMap.put("createdAt", user.getCreatedAt());
+                userMap.put("updatedAt", user.getUpdatedAt());
+                return userMap;
+            }).toList();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "SUCCESS");
+            response.put("message", "Users retrieved successfully for admin dashboard");
+            response.put("users", formattedUsers);
+            response.put("count", formattedUsers.size());
+            response.put("timestamp", java.time.LocalDateTime.now().toString());
+            
+            System.out.println("✅ Admin Dashboard: Sent " + formattedUsers.size() + " users to frontend");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.out.println("❌ Admin Dashboard: Error retrieving users: " + e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "ERROR");
+            errorResponse.put("error", "Failed to get users: " + e.getMessage());
             return ResponseEntity.internalServerError().body(errorResponse);
         }
     }

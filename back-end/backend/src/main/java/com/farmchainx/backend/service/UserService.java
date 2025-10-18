@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,36 +22,66 @@ public class UserService {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserService.class);
     
     public boolean emailExists(String email) {
-        return userRepository.existsByEmail(email);
+        boolean exists = userRepository.existsByEmail(email);
+        logger.debug("Email exists check for {}: {}", email, exists);
+        return exists;
     }
     
     public User createUser(User user) {
-        // Ensure role consistency
-        if ("FAWBER".equals(user.getRole())) {
-            user.setRole("FARMER");
-        } else if ("CONSUME".equals(user.getRole())) {
-            user.setRole("CONSUMER");
+        try {
+            // Ensure role consistency
+            String role = user.getRole();
+            if ("FAWBER".equals(role)) {
+                user.setRole("FARMER");
+            } else if ("CONSUME".equals(role)) {
+                user.setRole("CONSUMER");
+            } else if ("DISTRIBUTO".equals(role)) {
+                user.setRole("DISTRIBUTOR");
+            }
+            
+            // Auto-approve all users
+            user.setApproved(true);
+            
+            logger.info("Creating user: {} with role: {}", user.getEmail(), user.getRole());
+            User savedUser = userRepository.save(user);
+            logger.info("User created successfully with ID: {}", savedUser.getId());
+            
+            return savedUser;
+            
+        } catch (Exception e) {
+            logger.error("Error creating user: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to create user: " + e.getMessage());
         }
-        
-        // Auto-approve all users
-        user.setApproved(true);
-        
-        return userRepository.save(user);
     }
     
     public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+        Optional<User> user = userRepository.findByEmail(email);
+        logger.debug("Retrieved user by email {}: {}", email, user.isPresent() ? "Found" : "Not found");
+        return user;
     }
     
     public User updateUser(User user) {
-        // Ensure role consistency before updating
-        if ("FAWBER".equals(user.getRole())) {
-            user.setRole("FARMER");
-        } else if ("CONSUME".equals(user.getRole())) {
-            user.setRole("CONSUMER");
+        try {
+            // Ensure role consistency before updating
+            String role = user.getRole();
+            if ("FAWBER".equals(role)) {
+                user.setRole("FARMER");
+            } else if ("CONSUME".equals(role)) {
+                user.setRole("CONSUMER");
+            } else if ("DISTRIBUTO".equals(role)) {
+                user.setRole("DISTRIBUTOR");
+            }
+            
+            user.setUpdatedAt(LocalDateTime.now());
+            User updatedUser = userRepository.save(user);
+            logger.info("User updated successfully: {}", updatedUser.getEmail());
+            
+            return updatedUser;
+            
+        } catch (Exception e) {
+            logger.error("Error updating user: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to update user: " + e.getMessage());
         }
-        
-        return userRepository.save(user);
     }
     
     public List<User> getAllUsers() {
@@ -88,8 +119,10 @@ public class UserService {
             logger.info("User deleted successfully: {}", user.getEmail());
             
         } catch (RuntimeException e) {
+            logger.error("Error rejecting user: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
+            logger.error("Error rejecting user: {}", e.getMessage(), e);
             throw new RuntimeException("Error deleting user: " + e.getMessage());
         }
     }
@@ -113,6 +146,7 @@ public class UserService {
             stats.put("totalConsumers", consumers);
             stats.put("totalAdmins", admins);
             
+            logger.info("User stats generated: {}", stats);
             return stats;
             
         } catch (Exception e) {
@@ -139,7 +173,9 @@ public class UserService {
     }
     
     public long countUsers() {
-        return userRepository.count();
+        long count = userRepository.count();
+        logger.debug("Total user count: {}", count);
+        return count;
     }
     
     public long countPendingUsers() {
@@ -147,7 +183,9 @@ public class UserService {
     }
     
     public Optional<User> getUserById(Long userId) {
-        return userRepository.findById(userId);
+        Optional<User> user = userRepository.findById(userId);
+        logger.debug("Retrieved user by ID {}: {}", userId, user.isPresent() ? "Found" : "Not found");
+        return user;
     }
     
     public long countApprovedUsers() {
@@ -157,12 +195,21 @@ public class UserService {
     public List<User> getUsersByRole(String role) {
         List<User> users = userRepository.findByRole(role);
         users.forEach(user -> {
-            if ("FAWBER".equals(user.getRole())) {
+            String userRole = user.getRole();
+            if ("FAWBER".equals(userRole)) {
                 user.setRole("FARMER");
-            } else if ("CONSUME".equals(user.getRole())) {
+            } else if ("CONSUME".equals(userRole)) {
                 user.setRole("CONSUMER");
+            } else if ("DISTRIBUTO".equals(userRole)) {
+                user.setRole("DISTRIBUTOR");
             }
         });
+        logger.debug("Retrieved {} users with role: {}", users.size(), role);
         return users;
+    }
+    
+    public boolean validateUserCredentials(String email, String password) {
+        Optional<User> user = getUserByEmail(email);
+        return user.isPresent() && user.get().getApproved();
     }
 }

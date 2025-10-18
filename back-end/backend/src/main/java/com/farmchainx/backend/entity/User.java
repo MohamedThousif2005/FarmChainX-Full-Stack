@@ -1,6 +1,7 @@
 package com.farmchainx.backend.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +31,27 @@ public class User {
     @Column(nullable = false)
     private Boolean approved = true;
 
+    // New optional fields for role-specific data
+    @Column(name = "farm_name")
+    private String farmName;
+
+    @Column(name = "farm_size")
+    private String farmSize;
+
+    @Column(name = "company_name")
+    private String companyName;
+
+    @Column(name = "delivery_area")
+    private String deliveryArea;
+
+    private String preferences;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Crop> crops = new ArrayList<>();
 
@@ -41,6 +63,32 @@ public class User {
 
     @OneToMany(mappedBy = "distributor", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Order> distributorOrders = new ArrayList<>();
+
+    // Constructors
+    public User() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public User(String email, String password, String fullName, String role) {
+        this();
+        this.email = email;
+        this.password = password;
+        this.fullName = fullName;
+        this.role = role;
+        this.approved = true;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -67,6 +115,27 @@ public class User {
     public Boolean getApproved() { return approved; }
     public void setApproved(Boolean approved) { this.approved = approved; }
 
+    public String getFarmName() { return farmName; }
+    public void setFarmName(String farmName) { this.farmName = farmName; }
+
+    public String getFarmSize() { return farmSize; }
+    public void setFarmSize(String farmSize) { this.farmSize = farmSize; }
+
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
+
+    public String getDeliveryArea() { return deliveryArea; }
+    public void setDeliveryArea(String deliveryArea) { this.deliveryArea = deliveryArea; }
+
+    public String getPreferences() { return preferences; }
+    public void setPreferences(String preferences) { this.preferences = preferences; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
     public List<Crop> getCrops() { return crops; }
     public void setCrops(List<Crop> crops) { this.crops = crops; }
 
@@ -78,4 +147,16 @@ public class User {
 
     public List<Order> getDistributorOrders() { return distributorOrders; }
     public void setDistributorOrders(List<Order> distributorOrders) { this.distributorOrders = distributorOrders; }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", email='" + email + '\'' +
+                ", fullName='" + fullName + '\'' +
+                ", role='" + role + '\'' +
+                ", approved=" + approved +
+                ", createdAt=" + createdAt +
+                '}';
+    }
 }
